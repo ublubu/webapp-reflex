@@ -17,7 +17,17 @@ import Pages
 import Utils
 
 main :: IO ()
-main = mainWidget $ routedWidget pageRouter IntroPage
+--main = mainWidget $ routedWidget pageRouter IntroPage
+main = mainWidget test
+
+test :: (MonadWidget t m) => m ()
+test = do
+  clicks <- button "asdf"
+  value <- holdDyn Nothing (fmap Just clicks)
+  dWhenJust value f
+  where f x = do
+          content <- mapDyn show x
+          dynText content
 
 articlePage :: (MonadWidget t m) => Dynamic t ArticleState -> m (Routing t PageState ())
 articlePage articleState = do
