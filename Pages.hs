@@ -12,8 +12,8 @@ data Article = Article {
 makeLenses ''Article
 
 data ArticleState = ArticleState {
-  _articleId :: Int64,
-  _articleContents :: Article
+  _articleContents :: Article,
+  _articlePageNumber :: Int
   } deriving (Show, Eq)
 makeLenses ''ArticleState
 

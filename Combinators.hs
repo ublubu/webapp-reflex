@@ -10,6 +10,7 @@ import Reflex.Dom
 
 import Control.Lens
 import Control.Monad
+import Data.Maybe
 
 {-
 Let's assume that all widgets return a static value or Event stream.
@@ -37,6 +38,12 @@ class (MonadWidget t m) => EventContainer t m a where
 dWhen :: (EventContainer t m a) => Dynamic t Bool -> m a -> m a
 dWhen test widget =
   ecDyn' (\t -> if t then widget else ecNever) test
+
+dWhenJust :: (EventContainer t m a) => Dynamic t (Maybe x) -> (Dynamic t x -> m a) -> m a
+dWhenJust maybeVal makeWidget = do
+  val <- mapDyn (fromMaybe undefined) maybeVal
+  test <- fmap nubDyn $ mapDyn isJust maybeVal
+  dWhen test (makeWidget val)
 
 eWhen :: (EventContainer t m a) => Event t b -> m a -> m a
 eWhen test widget = do
