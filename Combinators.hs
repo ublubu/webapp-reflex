@@ -94,10 +94,21 @@ class (Reflex t) => RoutingContainer t r c where
 
 instance (Reflex t) => RoutingContainer t r (Routing t r a, Routing t r b) where
   type RContents (Routing t r a, Routing t r b) = (a, b)
-  rcFactor (ra, rb) = Routing (view rRoutes ra `eCombine` view rRoutes rb) (ra ^. rContents, rb ^. rContents)
+  rcFactor (ra, rb) =
+    Routing (view rRoutes ra `eCombine` view rRoutes rb) (ra ^. rContents, rb ^. rContents)
+
+instance (Reflex t) => RoutingContainer t r [Routing t r a] where
+  type RContents [Routing t r a] = [a]
+  rcFactor ras = Routing (leftmost $ fmap _rRoutes ras) (fmap _rContents ras)
 
 rdIf :: (EventContainer t m a, EventContainer t m b) => Dynamic t Bool -> m (Routing t r a) -> m (Routing t r b) -> m (Routing t r (a, b))
 rdIf test true false = fmap rcFactor $ dIf test true false
 
 neverRouting :: (Reflex t) => a -> Routing t r a
 neverRouting = Routing never
+
+onlyRouting :: Routing t r a -> Routing t r ()
+onlyRouting = set rContents ()
+
+routing :: (Reflex t) => Event t r -> Routing t r ()
+routing = flip Routing ()

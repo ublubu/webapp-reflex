@@ -92,3 +92,6 @@ ewhen' :: (MonadWidget t m) => Event t a -> m (Dynamic t b) -> m (Event t b)
 ewhen' test widget = do
   test' <- holdDyn False (fmap (const True) test)
   dwhen' test' widget
+
+eventValue :: (Reflex t) => r -> Event t a -> Event t r
+eventValue r = fmap (const r)

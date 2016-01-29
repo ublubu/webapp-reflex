@@ -5,6 +5,8 @@ module CommonWidgets where
 import Reflex
 import Reflex.Dom
 
+import Data.Text (Text, unpack)
+
 import Combinators
 import Utils
 
@@ -16,3 +18,9 @@ toggleButton initVal makeTrue makeFalse = mdo
   toggleEvents <- dIf' val makeFalseButton makeTrueButton
   val <- holdDyn initVal toggleEvents
   return val
+
+textT :: (MonadWidget t m) => Text -> m ()
+textT = text . unpack
+
+buttonT :: (MonadWidget t m) => Text -> m (Event t ())
+buttonT = button . unpack
