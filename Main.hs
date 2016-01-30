@@ -17,17 +17,17 @@ import Pages
 import Utils
 
 main :: IO ()
---main = mainWidget $ routedWidget pageRouter IntroPage
-main = mainWidget test
+main = mainWidget $ routedWidget pageRouter IntroPage
 
 test :: (MonadWidget t m) => m ()
 test = do
-  clicks <- button "asdf"
-  value <- holdDyn Nothing (fmap Just clicks)
+  value <- mapDyn fromBool =<< toggleButton False "turn on" "turn off"
   dWhenJust value f
   where f x = do
           content <- mapDyn show x
           dynText content
+        fromBool False = Nothing
+        fromBool True = Just ()
 
 articlePage :: (MonadWidget t m) => Dynamic t ArticleState -> m (Routing t PageState ())
 articlePage articleState = do
@@ -50,7 +50,7 @@ articleFlipper pageNumber makePageNumberRoute = do
   el "div" $ do
     text "page: "
     void $ ecDyn' (text . show) pageNumber
-  fmap (routing . tagDyn nextPageRoute) $ button "next page"
+    fmap (routing . tag (current nextPageRoute)) $ button "next page"
 
 introPage :: (MonadWidget t m) => Dynamic t [ArticleState] -> m (Routing t PageState ())
 introPage articleStates = do

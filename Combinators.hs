@@ -18,7 +18,15 @@ Widgets can't do anything until they're built, so the initial value of
   any Dynamic they return would use some initial value owned by the parent.
 -}
 
-class (MonadWidget t m) => EventContainer t m a where
+type ExtractWith f x m a = (f a -> m a) -> (x -> a) -> f x -> m a
+
+class Leftmostable a where
+  ecExtractLeftmost :: (x -> a) -> [x] -> a
+  ecExtractLeftmost focus = ecLeftmost . fmap focus
+
+  ecLeftmost :: [a] -> a
+
+class (Leftmostable a, MonadWidget t m) => EventContainer t m a where
   ecDyn :: Dynamic t (m a) -> m a
   ecDyn = ecJoin <=< dyn
 
@@ -28,12 +36,15 @@ class (MonadWidget t m) => EventContainer t m a where
   ecNever :: m a
   ecNever = ecJoin never
 
-  ecExtractWith :: (Functor f) => (f a -> m a) -> (x -> a) -> f x -> m a
+  ecExtractWith :: (Functor f) => ExtractWith f x m a
   ecExtractWith join focus = join . fmap focus
 
-  ecJoin :: Event t a -> m a
+  ecExtractWith' :: ExtractWith (Dynamic t) x m a
+  ecExtractWith' join focus = join <=< mapDyn focus
 
-  ecLeftmost :: [a] -> m a
+  ecSwitchPromptly :: Dynamic t a -> m a
+
+  ecJoin :: Event t a -> m a
 
 dWhen :: (EventContainer t m a) => Dynamic t Bool -> m a -> m a
 dWhen test widget =
@@ -41,9 +52,9 @@ dWhen test widget =
 
 dWhenJust :: (EventContainer t m a) => Dynamic t (Maybe x) -> (Dynamic t x -> m a) -> m a
 dWhenJust maybeVal makeWidget = do
-  val <- mapDyn (fromMaybe undefined) maybeVal
-  test <- fmap nubDyn $ mapDyn isJust maybeVal
-  dWhen test (makeWidget val)
+  val <- mapDyn maybeToList maybeVal
+  evtsDyn <- mapDyn ecLeftmost =<< simpleList val makeWidget
+  ecSwitchPromptly evtsDyn
 
 eWhen :: (EventContainer t m a) => Event t b -> m a -> m a
 eWhen test widget = do
@@ -60,29 +71,41 @@ dIf test true false = do
 dIf' :: (EventContainer t m a) => Dynamic t Bool -> m a -> m a -> m a
 dIf' test true false = do
   (trues, falses) <- dIf test true false
-  ecLeftmost [trues, falses]
+  return $ ecLeftmost [trues, falses]
 
 instance (MonadWidget t m) => EventContainer t m () where
   ecJoin = const $ return ()
-  ecLeftmost = const $ return ()
+  ecSwitchPromptly = const $ return ()
+
+instance Leftmostable () where
+  ecLeftmost = const ()
 
 instance (MonadWidget t m) => EventContainer t m (Event t a) where
-  ecJoin = (return . switchPromptlyDyn) <=< holdDyn never
-  ecLeftmost = return . leftmost
+  ecJoin = switchPromptly never
+  ecSwitchPromptly = return . switchPromptlyDyn
+
+instance (Reflex t) => Leftmostable (Event t a) where
+  ecLeftmost = leftmost
 
 instance (EventContainer t m a, EventContainer t m b) => EventContainer t m (a, b) where
-  ecJoin = ecTuple2 ecJoin ecJoin
-  ecLeftmost = ecTuple2 ecLeftmost ecLeftmost
+  ecJoin ecEvt =
+    (,) <$> ecExtractWith ecJoin fst ecEvt <*> ecExtractWith ecJoin snd ecEvt
+  ecSwitchPromptly ecDyn =
+    (,) <$> ecExtractWith' ecSwitchPromptly fst ecDyn <*> ecExtractWith' ecSwitchPromptly snd ecDyn
 
-ecTuple2 :: (EventContainer t m a, EventContainer t m b, Functor f) => (f a -> m a) -> (f b -> m b) -> f (a, b) -> m (a, b)
-ecTuple2 f g eventPairs = (,) <$> (ecExtractWith f) fst eventPairs <*> (ecExtractWith g) snd eventPairs
+instance (Leftmostable a, Leftmostable b) => Leftmostable (a, b) where
+  ecLeftmost ecList =
+    (ecExtractLeftmost fst ecList, ecExtractLeftmost snd ecList)
 
 instance (EventContainer t m a) => EventContainer t m (Routing t r a) where
-  ecJoin = ecRouting ecJoin ecJoin
-  ecLeftmost = ecRouting ecLeftmost ecLeftmost
+  ecJoin ecEvt =
+    Routing <$> ecExtractWith ecJoin _rRoutes ecEvt <*> ecExtractWith ecJoin _rContents ecEvt
+  ecSwitchPromptly ecDyn =
+    Routing <$> ecExtractWith' ecSwitchPromptly _rRoutes ecDyn <*> ecExtractWith' ecSwitchPromptly _rContents ecDyn
 
-ecRouting :: (EventContainer t m a, Functor f) => (f (Event t r) -> m (Event t r)) -> (f a -> m a) -> f (Routing t r a) -> m (Routing t r a)
-ecRouting f g routings = Routing <$> (ecExtractWith f) _rRoutes routings <*> (ecExtractWith g) _rContents routings
+instance (Reflex t, Leftmostable a) => Leftmostable (Routing t r a) where
+  ecLeftmost ecList =
+    Routing (ecExtractLeftmost _rRoutes ecList) (ecExtractLeftmost _rContents ecList)
 
 eCombine :: (Reflex t) => Event t a -> Event t a -> Event t a
 eCombine a b = leftmost [a, b]
