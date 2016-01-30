@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
@@ -9,6 +10,8 @@ import Reflex.Dom
 
 import Control.Lens
 import Control.Monad
+import Data.Map (Map, (!))
+import qualified Data.Map as M
 import Data.Text (unpack)
 
 import Combinators
@@ -49,7 +52,7 @@ articleFlipper pageNumber makePageNumberRoute = do
 
   el "div" $ do
     text "page: "
-    void $ ecDyn' (text . show) pageNumber
+    void $ transitionController (text . show) pageNumber
     fmap (routing . tag (current nextPageRoute)) $ button "next page"
 
 introPage :: (MonadWidget t m) => Dynamic t [ArticleState] -> m (Routing t PageState ())
@@ -98,3 +101,52 @@ routedWidget f x0 = mdo
   xs <- f x
   x <- holdDyn x0 xs
   noContents
+
+-- TODO: use listHoldWithKey when it comes out
+transitionController :: forall t m b a . (EventContainer t m b) => (a -> m b) -> Dynamic t a -> m b
+transitionController makeWidget val = mdo
+  val0 <- sample (current val)
+  let indexedVal0 = (0, val0) :: (Int, a)
+  indexedVals <- foldDyn (\v1 (i0, v0) -> (i0 + 1, v1)) indexedVal0 (updated val)
+
+  let inserters = fmap (uncurry M.insert) (updated indexedVals)
+      transitioningVals0 = uncurry M.singleton indexedVal0
+      updates = leftmost [inserters, removers]
+  transitioningVals <- foldDyn ($) transitioningVals0 updates
+
+  -- itemResultsMap :: Dynamic t (Map k (Event t (), b))
+  itemResultsMapDyn <- list transitioningVals (withDynSample $ transitionItem makeWidget)
+
+  -- removerAndResultDyn :: Dynamic (Event t ((Map k a -> Map k a), b))
+  removerAndResultDyn <- mapDyn getReplacedItemRemover itemResultsMapDyn
+  let removerAndResults = switchPromptlyDyn removerAndResultDyn
+      removers = fmap fst removerAndResults
+  newResults <- ecJoin $ fmap snd removerAndResults
+  -- block the results during transitions
+  nullResult <- ecNever :: m b
+  nullResults <- ecJoin $ fmap (const nullResult) inserters
+  return $ ecLeftmost [newResults, nullResults]
+
+getReplacedItemRemover :: (Reflex t, Ord k) => Map k (Event t x, b) -> Event t ((Map k a -> Map k a), b)
+getReplacedItemRemover triggersAndResults =
+  fmap getRemoverAndResult taggedTrigger
+  where triggers = M.map fst triggersAndResults
+        results = M.map snd triggersAndResults
+        taggedTrigger = leftmost . fmap snd $ M.toDescList (tagTriggers triggers)
+        getRemoverAndResult key = (deleteLessThan key, results ! key)
+
+tagTriggers :: (Reflex t, Ord k) => Map k (Event t x) -> Map k (Event t k)
+tagTriggers = M.mapWithKey (\k evt -> fmap (const k) evt)
+
+deleteLessThan :: (Ord k) => k -> Map k a -> Map k a
+deleteLessThan testKey = M.filterWithKey (\k _ -> k >= testKey)
+
+withDynSample :: (MonadWidget t m) => (a -> m b) -> Dynamic t a -> m b
+withDynSample makeWidget val =
+  makeWidget =<< sample (current val)
+
+transitionItem :: (MonadWidget t m) => (a -> m b) -> a -> m (Event t (), b)
+transitionItem makeWidget val = do
+  pb <- getPostBuild
+  evt <- makeWidget val
+  return (pb, evt)
