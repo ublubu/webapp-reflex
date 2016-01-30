@@ -114,16 +114,15 @@ transitionController makeWidget val = mdo
       updates = leftmost [inserters, removers]
   transitioningVals <- foldDyn ($) transitioningVals0 updates
 
-  -- itemResultsMap :: Dynamic t (Map k (Event t (), b))
   itemResultsMapDyn <- list transitioningVals (withDynSample $ transitionItem makeWidget)
 
-  -- removerAndResultDyn :: Dynamic (Event t ((Map k a -> Map k a), b))
   removerAndResultDyn <- mapDyn getReplacedItemRemover itemResultsMapDyn
+                         :: m (Dynamic t (Event t ((Map Int a -> Map Int a), b)))
   let removerAndResults = switchPromptlyDyn removerAndResultDyn
       removers = fmap fst removerAndResults
   newResults <- ecJoin $ fmap snd removerAndResults
   -- block the results during transitions
-  nullResult <- ecNever :: m b
+  nullResult <- ecNever
   nullResults <- ecJoin $ fmap (const nullResult) inserters
   return $ ecLeftmost [newResults, nullResults]
 
