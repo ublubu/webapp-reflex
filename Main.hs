@@ -17,7 +17,7 @@ import Pages
 import Utils
 
 main :: IO ()
-main = mainWidget $ routedWidget pageRouter IntroPage
+main = mainWidget $ historyWidget pageRouter IntroPage
 
 test :: (MonadWidget t m) => m ()
 test = do
@@ -79,6 +79,19 @@ articleStateB = ArticleState articleB 1
 
 someArticleStates :: [ArticleState]
 someArticleStates = [articleStateA, articleStateB]
+
+historyWidget :: (MonadWidget t m) => (Dynamic t r -> m (Event t r)) -> r -> m ()
+historyWidget f route0 = mdo
+  let doPushStates = fmap (:) (tag (current currentRoute) newStates)
+      doPopStates = fmap (const tail) popStates
+      updates = leftmost [doPushStates, doPopStates]
+  history <- foldDyn ($) [] updates
+  lastRoute <- mapDyn head history
+  currentRoute <- holdDyn route0 $ leftmost [popStates, newStates]
+
+  popStates <- fmap (tag $ current lastRoute) $ button "back"
+  newStates <- f currentRoute
+  noContents
 
 routedWidget :: (MonadWidget t m) => (Dynamic t r -> m (Event t r)) -> r -> m ()
 routedWidget f x0 = mdo
