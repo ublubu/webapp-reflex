@@ -12,12 +12,17 @@ import Control.Lens
 import Control.Monad
 import Data.Map (Map, (!))
 import qualified Data.Map as M
+import Data.Monoid
 import Data.Text (unpack)
 
 import Combinators
 import CommonWidgets
 import Pages
+import Style
+import qualified Styles as S
 import Utils
+
+import API.SignIn
 
 main :: IO ()
 main = mainWidget $ historyWidget pageRouter IntroPage
@@ -51,9 +56,27 @@ articleFlipper pageNumber makePageNumberRoute = do
   nextPageRoute <- combineDyn ($) makePageNumberRoute nextPageNumber
 
   el "div" $ do
+    let pageNumberSize = (100, 100)
     text "page: "
-    void $ transitionController (text . show) pageNumber
-    fmap (routing . tag (current nextPageRoute)) $ button "next page"
+    routings <- fmap (routing . tag (current nextPageRoute)) $ button "next page"
+    void $ fixedContainer pageNumberSize $ do
+      transitionController swipeUp (articleDummyPage pageNumberSize) pageNumber
+
+    return routings
+
+articleDummyPage :: (MonadWidget t m) => (Int, Int) -> Int -> m ()
+articleDummyPage (w, h) pageNumber =
+  elAttr "div" (toAttr $ S.width w
+                <> S.height h
+                <> "font-size" =: "10em"
+                <> S.backgroundColor "grey")
+  $ text (show pageNumber)
+
+fixedContainer :: (MonadWidget t m) => (Int, Int) -> m a -> m a
+fixedContainer (w, h) =
+  elAttr "div" (toAttr $ S.posRel
+                <> S.width w
+                <> S.height h)
 
 introPage :: (MonadWidget t m) => Dynamic t [ArticleState] -> m (Routing t PageState ())
 introPage articleStates = do
@@ -103,8 +126,8 @@ routedWidget f x0 = mdo
   noContents
 
 -- TODO: use listHoldWithKey when it comes out
-transitionController :: forall t m b a . (EventContainer t m b) => (a -> m b) -> Dynamic t a -> m b
-transitionController makeWidget val = mdo
+transitionController :: forall a t m b . (EventContainer t m b) => Transitioner a t m b -> (a -> m b) -> Dynamic t a -> m b
+transitionController transitioner makeWidget val = mdo
   val0 <- sample (current val)
   let indexedVal0 = (0, val0) :: (Int, a)
   indexedVals <- foldDyn (\v1 (i0, v0) -> (i0 + 1, v1)) indexedVal0 (updated val)
@@ -114,7 +137,7 @@ transitionController makeWidget val = mdo
       updates = leftmost [inserters, removers]
   transitioningVals <- foldDyn ($) transitioningVals0 updates
 
-  itemResultsMapDyn <- list transitioningVals (withDynSample $ transitionItem makeWidget)
+  itemResultsMapDyn <- list transitioningVals (withDynSample $ transitioner makeWidget)
 
   removerAndResultDyn <- mapDyn getReplacedItemRemover itemResultsMapDyn
                          :: m (Dynamic t (Event t ((Map Int a -> Map Int a), b)))
@@ -144,8 +167,22 @@ withDynSample :: (MonadWidget t m) => (a -> m b) -> Dynamic t a -> m b
 withDynSample makeWidget val =
   makeWidget =<< sample (current val)
 
-transitionItem :: (MonadWidget t m) => (a -> m b) -> a -> m (Event t (), b)
-transitionItem makeWidget val = do
+type Transitioner a t m b = (a -> m b) -> a -> m (Event t (), b)
+
+noTransition :: (MonadWidget t m) => Transitioner a t m b
+noTransition makeWidget val = do
   pb <- getPostBuild
   evt <- makeWidget val
   return (pb, evt)
+
+swipeUp :: (MonadWidget t m) => Transitioner a t m b
+swipeUp makeWidget val = mdo
+  let loaded = domEvent Load containerEl
+      containerStyle = "transition" =: "-webkit-transform 1s"
+                       <> "-webkit-transform" =: "translateY(100px)"
+                       <> S.posAbs
+      containerStyle' = "-webkit-transform" =: "none" <> containerStyle
+  styleDyn <- holdDyn containerStyle $ fmap (const containerStyle') loaded
+  attrDyn <- mapDyn toAttr styleDyn
+  (containerEl, evt) <- elDynAttr' "div" attrDyn $ makeWidget val
+  return (loaded, evt)
