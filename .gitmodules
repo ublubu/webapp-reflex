@@ -1,0 +1,3 @@
+[submodule "client/lib/ghcjs-servant-client"]
+	path = client/lib/ghcjs-servant-client
+	url = git@github.com:ublubu/ghcjs-servant-client.git

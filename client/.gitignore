@@ -18,3 +18,4 @@ cabal.sandbox.config
 TAGS
 shell.nix
 default.nix
+node_modules

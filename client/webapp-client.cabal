@@ -58,6 +58,7 @@ executable webapp-client
   
   -- Other library packages from which modules are imported.
   build-depends:       base
+                     , ghcjs-base
                      , reflex
                      , reflex-dom
                      , aeson
@@ -69,7 +70,10 @@ executable webapp-client
                      , bytestring
                      , text
                      , either
+                     , ref-tf
+                     , dependent-map
                      , servant
+                     , ghcjs-servant-client
                      , webapp-api
   
   -- Directories containing source files.

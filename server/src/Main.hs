@@ -13,21 +13,21 @@ import Network.Wai.Middleware.RequestLogger (logStdoutDev, logStdout)
 import Servant
 import Servant.Server
 
-import API.Nades
+import API.Code
 import API.SignIn
-import Database.Nades
+import Database.Code
 import Server.App
-import Server.Nades
+import Server.Code
 import Server.SignIn
 
 type StaticAPI = Raw
-type API = ("api" :> (SignInAPI :<|> NadesAPI)) :<|> StaticAPI
+type API = ("api" :> (SignInAPI :<|> CodeAPI)) :<|> StaticAPI
 
 api :: Proxy API
 api = Proxy
 
 server :: AppConfig -> Server API
-server config = f (signInServer :<|> nadesServer) :<|> serveDirectory (_appConfigStaticRoot config)
+server config = f (signInServer :<|> codeServer) :<|> serveDirectory (_appConfigStaticRoot config)
   where f = enter (Nat $ runApp config)
 
 loadDb :: AppConfig -> IO ()
@@ -44,6 +44,3 @@ runAppConfig config = do
 
 main :: IO ()
 main = runAppConfig =<< defaultAppConfig "."
-
-main' :: IO ()
-main' = runAppConfig =<< defaultAppConfig ".."

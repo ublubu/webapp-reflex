@@ -53,6 +53,12 @@ withCookieText :: (CookieData -> App a) -> Maybe Text -> App a
 withCookieText f =
   f <=< maybe (throwError $ Invalid "no cookie provided") (decryptCookie . unwrapCookie)
 
+withCookieText1 :: (x -> CookieData -> App a) -> x -> Maybe Text -> App a
+withCookieText1 f = withCookieText . f
+
+withCookieText2 :: (x -> y -> CookieData -> App a) -> x -> y -> Maybe Text -> App a
+withCookieText2 f = withCookieText1 . f
+
 cookiePrefix :: Text
 cookiePrefix = "Session="
 
