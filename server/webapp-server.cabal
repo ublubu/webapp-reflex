@@ -87,6 +87,7 @@ executable exec-csgo-guides-server
                      , transformers
                      , uuid
                      , wai
+                     , wai-app-static
                      , wai-extra
                      , warp
                      , webapp-api

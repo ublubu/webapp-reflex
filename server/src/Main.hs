@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
@@ -18,6 +19,7 @@ import API.SignIn
 import Database.Code
 import Server.App
 import Server.Code
+import Server.Raw
 import Server.SignIn
 
 type StaticAPI = Raw
@@ -27,7 +29,8 @@ api :: Proxy API
 api = Proxy
 
 server :: AppConfig -> Server API
-server config = f (signInServer :<|> codeServer) :<|> serveDirectory (_appConfigStaticRoot config)
+server config@AppConfig{..} =
+  f (signInServer :<|> codeServer) :<|> rawServer _appConfigStaticRoot
   where f = enter (Nat $ runApp config)
 
 loadDb :: AppConfig -> IO ()
