@@ -8,22 +8,29 @@ module Main where
 import Reflex
 import Reflex.Dom
 
+import Control.Monad.IO.Class
+import Data.Monoid
+
 import Callback
 import Combinators
 import CommonWidgets
 import History
 import Pages
+import SignIn
 import Style
 import qualified Styles as S
 import Utils
 
+import GoogleSignIn
+
 import API.SignIn
 
 main :: IO ()
-main = mainWidget $ pathnameHistoryWidget parsePath (\i -> "/" ++ show i) dummyCounter
-  where parsePath "/" = 0
-        parsePath ('/':x) = read x
-        parsePath _ = error "invalid path"
+main = mainWidgetWithHead headEl $ mdo
+  signIns <- signInEvent
+  performEvent_ (fmap (liftIO . print) signIns)
+  gSignInButton
+  pathnameHistoryWidget parsePath (\i -> "/" ++ show i) dummyCounter
 
 dummyCounter :: (MonadWidget t m)
              => Dynamic t Int
@@ -32,3 +39,18 @@ dummyCounter route = do
   btnPresses <- ecDyn' (button . show) route
   nextRoute <- mapDyn (+1) route
   return $ tag (current nextRoute) btnPresses
+
+parsePath :: String -> Int
+parsePath "/" = 0
+parsePath ('/':x) = read x
+parsePath _ = error "invalid path"
+
+css :: String
+css = toCssString $ body <> html
+  where body = "body" =: (S.fullWindow <> S.noMargin)
+        html = "html" =: S.fullWindow
+
+headEl :: (MonadWidget t m) => m ()
+headEl = do
+  gSignInHeadEl
+  el "style" $ text css
