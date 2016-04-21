@@ -15,7 +15,7 @@ import Callback
 import Combinators
 import CommonWidgets
 import History
-import Pages
+import Layout
 import SignIn
 import Style
 import qualified Styles as S
@@ -28,9 +28,9 @@ import API.SignIn
 main :: IO ()
 main = mainWidgetWithHead headEl $ mdo
   signIns <- signInEvent
-  performEvent_ (fmap (liftIO . print) signIns)
-  gSignInButton
-  pathnameHistoryWidget parsePath (\i -> "/" ++ show i) dummyCounter
+  centeringDiv $ rowDiv $ do
+    columnDiv gSignInButton
+    columnDiv $ pathnameHistoryWidget parsePath (\i -> "/" ++ show i) dummyCounter
 
 dummyCounter :: (MonadWidget t m)
              => Dynamic t Int

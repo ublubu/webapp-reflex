@@ -77,6 +77,15 @@ displayFlex = display "flex"
 displayInlineFlex :: StyleMap
 displayInlineFlex = display "inline-flex"
 
+flexDir :: String -> StyleMap
+flexDir dir = "flex-direction" =: dir
+
+flexRow :: StyleMap
+flexRow = flexDir "row"
+
+flexCol :: StyleMap
+flexCol = flexDir "column"
+
 displayInlineBlock :: StyleMap
 displayInlineBlock = display "inline-block"
 

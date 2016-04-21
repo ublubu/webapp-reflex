@@ -14,23 +14,23 @@ import Network.Wai.Middleware.RequestLogger (logStdoutDev, logStdout)
 import Servant
 import Servant.Server
 
-import API.Code
+import API.Module
 import API.SignIn
-import Database.Code
+import Database.Module
 import Server.App
-import Server.Code
+import Server.Module
 import Server.Raw
 import Server.SignIn
 
 type StaticAPI = Raw
-type API = ("api" :> (SignInAPI :<|> CodeAPI)) :<|> StaticAPI
+type API = ("api" :> (SignInAPI :<|> ModuleAPI)) :<|> StaticAPI
 
 api :: Proxy API
 api = Proxy
 
 server :: AppConfig -> Server API
 server config@AppConfig{..} =
-  f (signInServer :<|> codeServer) :<|> rawServer _appConfigStaticRoot
+  f (signInServer :<|> moduleServer) :<|> rawServer _appConfigStaticRoot
   where f = enter (Nat $ runApp config)
 
 loadDb :: AppConfig -> IO ()

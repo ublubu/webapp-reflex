@@ -10,7 +10,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Database.Code where
+module Database.Module where
 
 import Control.Monad.Reader (ReaderT, asks, liftIO)
 import Data.Aeson (ToJSON, FromJSON)
@@ -20,10 +20,11 @@ import Database.Persist.TH (share, mkPersist, sqlSettings,
                             mkMigrate, persistLowerCase)
 import GHC.Generics (Generic)
 
--- TODO: rename "Code" to "Template"?
+-- TODO: rename "Module" to "Template"?
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
-Code
+Module
   guid Text
+  parentGuid Text Maybe
   authorId Text
   title Text
   description Text Maybe

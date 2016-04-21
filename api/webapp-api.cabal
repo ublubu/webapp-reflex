@@ -49,7 +49,7 @@ cabal-version:       >=1.10
 library
   -- Modules exported by the library.
   exposed-modules:     API.SignIn
-                     , API.Code
+                     , API.Module
   
   -- Modules included in this library but not exported.
   -- other-modules:       
