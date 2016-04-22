@@ -5,15 +5,21 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module APIClient where
 
 import GHCJS.Types
 import GHCJS.Marshal
 
+import Reflex
+import Reflex.Dom
+
+import Control.Monad
 import Control.Monad.Trans.Either
 import Control.Monad.Trans.Maybe
 import Control.Monad.IO.Class
+import Data.Either
 import Data.Int
 import Data.Proxy
 import Data.Text (Text)
@@ -58,3 +64,33 @@ cookiedata :: ServIO CookieData
 cookiedata = cookiedata' Nothing
 
 tokensignin :<|> cookiedata' = client signInApi baseUrl
+
+performWithLog :: forall a b t m. (MonadWidget t m)
+               => (a -> ServIO b)
+               -> Event t a
+               -> m (Event t b)
+performWithLog f evts = do
+  results <- performEvent (fmap toAction evts)
+  return $ fmapMaybe id results
+  where toAction :: a -> WidgetHost m (Maybe b)
+        toAction x = liftIO . (smashError =<<) . runEitherT . f $ x
+        smashError :: Either ServantError b -> IO (Maybe b)
+        smashError = either log (return . Just)
+        log :: ServantError -> IO (Maybe b)
+        log err = do
+          logError err
+          return Nothing
+
+logError :: ServantError -> IO ()
+logError (FailureResponse status ctype body) = do
+  print $ "FailureResponse " ++ show status ++ " " ++ show ctype
+  console_log body
+logError (DecodeFailure err ctype body) = do
+  print $ "DecodeFailure " ++ err ++ " " ++ show ctype
+  console_log body
+logError (UnsupportedContentType ctype body) = do
+  print $ "UnsupportedContentType " ++ show ctype
+  console_log body
+logError (InvalidContentTypeHeader hdr body) = do
+  print $ "InvalidContentTypeHeader " ++ BSC.unpack hdr
+  console_log body

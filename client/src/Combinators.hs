@@ -131,6 +131,8 @@ instance (Reflex t) => RoutingContainer t r [Routing t r a] where
   type RContents [Routing t r a] = [a]
   rcFactor ras = Routing (leftmost $ fmap _rRoutes ras) (fmap _rContents ras)
 
+-- TODO: typeclass for automatically lifting a sub-r into r
+--       e.g. `r` is giant sum type of various global actions (like flux)
 rdIf :: (EventContainer t m a, EventContainer t m b) => Dynamic t Bool -> m (Routing t r a) -> m (Routing t r b) -> m (Routing t r (a, b))
 rdIf test true false = fmap rcFactor $ dIf test true false
 

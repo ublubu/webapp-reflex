@@ -57,6 +57,7 @@ moduleToDb (ModuleMeta{..}, parentGuid, ModuleEdit{..}) =
             }
 
 -- TODO: add default pagesize to App config?
+-- TODO: bounded offset/pageSize
 -- TODO: like withCookieText for offset/count
 getModules :: Maybe Int -> Maybe Int -> App [ModuleView]
 getModules _offset count = do

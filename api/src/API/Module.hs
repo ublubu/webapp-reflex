@@ -29,6 +29,7 @@ data ModuleMeta =
   ModuleMeta { _mmAuthor :: Text
              , _mmGuid :: Text
              } deriving (Show, Eq, Generic)
+makeLenses ''ModuleMeta
 
 type ModuleView = (ModuleMeta, Maybe Text, ModuleEdit)
 type ModuleCreate = (Maybe Text, ModuleEdit)
