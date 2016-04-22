@@ -97,50 +97,51 @@ instance (Leftmostable a, Leftmostable b) => Leftmostable (a, b) where
   ecLeftmost ecList =
     (ecExtractLeftmost fst ecList, ecExtractLeftmost snd ecList)
 
-instance (EventContainer t m a) => EventContainer t m (Routing t r a) where
+instance (EventContainer t m a, EventContainer t m r) => EventContainer t m (Bubbling t r a) where
   ecJoin ecEvt =
-    Routing <$> ecExtractWith ecJoin _rRoutes ecEvt <*> ecExtractWith ecJoin _rContents ecEvt
+    Bubbling <$> ecExtractWith ecJoin _bBubble ecEvt <*> ecExtractWith ecJoin _bContents ecEvt
   ecSwitchPromptly ecDyn =
-    Routing <$> ecExtractWith' ecSwitchPromptly _rRoutes ecDyn <*> ecExtractWith' ecSwitchPromptly _rContents ecDyn
+    Bubbling <$> ecExtractWith' ecSwitchPromptly _bBubble ecDyn <*> ecExtractWith' ecSwitchPromptly _bContents ecDyn
 
-instance (Reflex t, Leftmostable a) => Leftmostable (Routing t r a) where
+instance (Reflex t, Leftmostable a, Leftmostable r) => Leftmostable (Bubbling t r a) where
   ecLeftmost ecList =
-    Routing (ecExtractLeftmost _rRoutes ecList) (ecExtractLeftmost _rContents ecList)
+    Bubbling (ecExtractLeftmost _bBubble ecList) (ecExtractLeftmost _bContents ecList)
 
-eCombine :: (Reflex t) => Event t a -> Event t a -> Event t a
-eCombine a b = leftmost [a, b]
+ecCombine :: (Leftmostable a) => a -> a -> a
+ecCombine a b = ecLeftmost [a, b]
 
-data Routing t r a = Routing { _rRoutes :: Event t r
-                             , _rContents :: a
-                             }
-makeLenses ''Routing
+data Bubbling t r a =
+  Bubbling { _bBubble :: r
+           , _bContents :: a
+           }
+makeLenses ''Bubbling
 
-rJoin :: (Reflex t) => Routing t r (Routing t r a) -> Routing t r a
-rJoin (Routing r1 (Routing r2 a)) = Routing (r1 `eCombine` r2) a
+rJoin :: (Reflex t, Leftmostable r) => Bubbling t r (Bubbling t r a) -> Bubbling t r a
+rJoin (Bubbling r1 (Bubbling r2 a)) = Bubbling (r1 `ecCombine` r2) a
 
-class (Reflex t) => RoutingContainer t r c where
+class (Reflex t) => BubblingContainer t r c where
   type RContents c :: *
-  rcFactor :: c -> Routing t r (RContents c)
+  rcFactor :: c -> Bubbling t r (RContents c)
 
-instance (Reflex t) => RoutingContainer t r (Routing t r a, Routing t r b) where
-  type RContents (Routing t r a, Routing t r b) = (a, b)
+instance (Reflex t, Leftmostable r) => BubblingContainer t r (Bubbling t r a, Bubbling t r b) where
+  type RContents (Bubbling t r a, Bubbling t r b) = (a, b)
   rcFactor (ra, rb) =
-    Routing (view rRoutes ra `eCombine` view rRoutes rb) (ra ^. rContents, rb ^. rContents)
+    Bubbling (view bBubble ra `ecCombine` view bBubble rb) (ra ^. bContents, rb ^. bContents)
 
-instance (Reflex t) => RoutingContainer t r [Routing t r a] where
-  type RContents [Routing t r a] = [a]
-  rcFactor ras = Routing (leftmost $ fmap _rRoutes ras) (fmap _rContents ras)
+instance (Reflex t, Leftmostable r) => BubblingContainer t r [Bubbling t r a] where
+  type RContents [Bubbling t r a] = [a]
+  rcFactor ras = Bubbling (ecLeftmost $ fmap _bBubble ras) (fmap _bContents ras)
 
 -- TODO: typeclass for automatically lifting a sub-r into r
 --       e.g. `r` is giant sum type of various global actions (like flux)
-rdIf :: (EventContainer t m a, EventContainer t m b) => Dynamic t Bool -> m (Routing t r a) -> m (Routing t r b) -> m (Routing t r (a, b))
+rdIf :: (EventContainer t m r, EventContainer t m a, EventContainer t m b) => Dynamic t Bool -> m (Bubbling t r a) -> m (Bubbling t r b) -> m (Bubbling t r (a, b))
 rdIf test true false = fmap rcFactor $ dIf test true false
 
-neverRouting :: (Reflex t) => a -> Routing t r a
-neverRouting = Routing never
+neverBubbling :: (EventContainer t m r) => a -> m (Bubbling t r a)
+neverBubbling x = flip Bubbling x <$> ecNever
 
-onlyRouting :: Routing t r a -> Routing t r ()
-onlyRouting = set rContents ()
+onlyBubbling :: Bubbling t r a -> Bubbling t r ()
+onlyBubbling = set bContents ()
 
-routing :: (Reflex t) => Event t r -> Routing t r ()
-routing = flip Routing ()
+bubbling :: (Reflex t) => r -> Bubbling t r ()
+bubbling = flip Bubbling ()
