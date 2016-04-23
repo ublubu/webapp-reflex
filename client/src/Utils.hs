@@ -94,4 +94,7 @@ ewhen' test widget = do
   dwhen' test' widget
 
 eventValue :: (Reflex t) => r -> Event t a -> Event t r
-eventValue r = fmap (const r)
+eventValue = fmap . const
+
+fire :: (MonadWidget t m) => r -> m (Event t r)
+fire r = eventValue r <$> getPostBuild

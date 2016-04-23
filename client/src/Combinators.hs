@@ -1,7 +1,9 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE GADTs #-}
 
 module Combinators where
 
@@ -11,6 +13,10 @@ import Reflex.Dom
 import Control.Lens
 import Control.Monad
 import Data.Maybe
+import Data.Monoid
+
+-- TODO: figure out if it's safe to merge event streams using `leftmost`
+-- TODO: import Apply here, not vice versa
 
 {-
 Let's assume that all widgets return a static value or Event stream.
@@ -46,21 +52,60 @@ class (Leftmostable a, MonadWidget t m) => EventContainer t m a where
 
   ecJoin :: Event t a -> m a
 
+-- ecLeftmost for two event streams
+ecCombine :: (Leftmostable a) => a -> a -> a
+ecCombine a b = ecLeftmost [a, b]
+
+-- extract an eventing widget
+ec :: (EventContainer t m r) => m (Dynamic t (m r)) -> m r
+ec = join . fmap ecDyn
+
+-- use an eventing widget whenever the Dynamic is True
 dWhen :: (EventContainer t m a) => Dynamic t Bool -> m a -> m a
 dWhen test widget =
   ecDyn' (\t -> if t then widget else ecNever) test
 
+-- use an eventing widget whenever the Dynamic contains a value
 dWhenJust :: (EventContainer t m a) => Dynamic t (Maybe x) -> (Dynamic t x -> m a) -> m a
 dWhenJust maybeVal makeWidget = do
   val <- mapDyn maybeToList maybeVal
   evtsDyn <- mapDyn ecLeftmost =<< simpleList val makeWidget
   ecSwitchPromptly evtsDyn
 
-eWhen :: (EventContainer t m a) => Event t b -> m a -> m a
-eWhen test widget = do
+-- use an eventing widget whenever the Dynamic contains a value
+dWhenJust' :: (EventContainer t m a) => Dynamic t (Maybe x) -> (x -> m a) -> m a
+dWhenJust' maybeVal makeWidget =
+  dWhenJust maybeVal f
+  where f = ec . mapDyn makeWidget
+
+-- freeze the Dynamic at its first value
+dFirst :: (MonadWidget t m)
+       => Dynamic t (Maybe x) -- some stream of Maybes
+       -> m (Dynamic t (Maybe x)) -- holds constant after the first Just
+dFirst allD = do
+  mFirst <- sample $ current allD
+  eFirst <- headE . ffilter isJust $ updated allD
+  case mFirst of Just x -> return $ constDyn mFirst
+                 Nothing -> holdDyn Nothing eFirst
+
+-- make an eventing widget with the first value of a Dynamic
+dWithFirst :: (EventContainer t m a)
+           => Dynamic t (Maybe x)
+           -> (x -> m a)
+           -> m a
+dWithFirst allD makeWidget = flip dWhenJust' makeWidget =<< dFirst allD
+
+-- create an eventing widget when the first event occurs
+eWhenFirst :: (EventContainer t m a) => Event t b -> m a -> m a
+eWhenFirst test widget = do
   test' <- holdDyn False (fmap (const True) test)
   dWhen test' widget
 
+-- equivalent of Control.Monad's `when` for EventContainers
+whenE :: (EventContainer t m a) => Bool -> m a -> m a
+whenE test x = if test then x else ecNever
+
+-- `if` statement for combining eventing widgets
 dIf :: (EventContainer t m a, EventContainer t m b) => Dynamic t Bool -> m a -> m b -> m (a, b)
 dIf test true false = do
   trues <- dWhen test true
@@ -68,10 +113,29 @@ dIf test true false = do
   falses <- dWhen notTest false
   return (trues, falses)
 
+-- simpler `if` statement for combining eventing widgets
 dIf' :: (EventContainer t m a) => Dynamic t Bool -> m a -> m a -> m a
 dIf' test true false = do
   (trues, falses) <- dIf test true false
   return $ ecLeftmost [trues, falses]
+
+data DynCase t s a where
+  DCase :: Getting (First x) s x -> (Dynamic t x -> a) -> DynCase t s a
+
+dCase :: (EventContainer t m a)
+      => Dynamic t s
+      -> [DynCase t s (m a)]
+      -> m a
+dCase dVal = fmap ecLeftmost . mapM (dHandleCase dVal)
+
+dHandleCase :: (EventContainer t m a)
+            => Dynamic t s
+            -> DynCase t s (m a)
+            -> m a
+dHandleCase dVal (DCase l makeWidget) = do
+  dSubVal <- mapDyn (preview l) dVal
+  dWhenJust dSubVal makeWidget
+  --join $ dWhenJust <$> (preview l @/ dVal) <#> makeWidget
 
 instance (MonadWidget t m) => EventContainer t m () where
   ecJoin = const $ return ()
@@ -107,18 +171,23 @@ instance (Reflex t, Leftmostable a, Leftmostable r) => Leftmostable (Bubbling t 
   ecLeftmost ecList =
     Bubbling (ecExtractLeftmost _bBubble ecList) (ecExtractLeftmost _bContents ecList)
 
-ecCombine :: (Leftmostable a) => a -> a -> a
-ecCombine a b = ecLeftmost [a, b]
+instance (Leftmostable b) => Leftmostable (a -> b) where
+  ecLeftmost ecList x = ecLeftmost $ fmap ($ x) ecList
 
+-- NOTE: if you accidentally fmap(?) into a `Bubbling t r a`, the type error may
+--         indicate that `Bubbling t r a` doesn't match `a`
+-- TODO: figure out why the above happens even though `Bubbling t r`
+--         has no explicit Functor/Applicative/Monad instance
 data Bubbling t r a =
   Bubbling { _bBubble :: r
            , _bContents :: a
-           }
+           } deriving (Show, Eq)
 makeLenses ''Bubbling
 
 rJoin :: (Reflex t, Leftmostable r) => Bubbling t r (Bubbling t r a) -> Bubbling t r a
 rJoin (Bubbling r1 (Bubbling r2 a)) = Bubbling (r1 `ecCombine` r2) a
 
+-- TODO: performance/optimization implications of all this never+leftmosting
 class (Reflex t) => BubblingContainer t r c where
   type RContents c :: *
   rcFactor :: c -> Bubbling t r (RContents c)
@@ -145,3 +214,39 @@ onlyBubbling = set bContents ()
 
 bubbling :: (Reflex t) => r -> Bubbling t r ()
 bubbling = flip Bubbling ()
+
+bLiftWith :: (EventContainer t m s)
+          => ASetter' s a
+          -> Bubbling t a x
+          -> m (Bubbling t s x)
+bLiftWith l bub = do
+  bub' <- bBubble (const ecNever) bub
+  return $ bub' & bBubble . l .~ (bub ^. bBubble)
+
+bMergeWith :: (Leftmostable s, Leftmostable a)
+           => ASetter' s a
+           -> (x -> y -> z)
+           -> Bubbling t a x
+           -> Bubbling t s y
+           -> Bubbling t s z
+bMergeWith l combine bub superBub =
+  superBub & bBubble . l %~ ecCombine (bub ^. bBubble)
+  & bContents %~ combine (bub ^. bContents)
+
+bMerge :: (Leftmostable a)
+       => (x -> y -> z)
+       -> Bubbling t a x
+       -> Bubbling t a y
+       -> Bubbling t a z
+bMerge combine bub1 bub2 =
+  bub2 & bBubble %~ ecCombine (bub1 ^. bBubble)
+  & bContents %~ combine (bub1 ^. bContents)
+
+bubble :: r -> Bubbling t r ()
+bubble = flip Bubbling ()
+
+bubbleWith :: (EventContainer t m s)
+           => ASetter' s a
+           -> a
+           -> m (Bubbling t s ())
+bubbleWith l = bLiftWith l . bubble

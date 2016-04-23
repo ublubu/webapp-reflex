@@ -13,6 +13,8 @@ import qualified APIClient as API
 import GoogleSignIn
 import API.SignIn (CookieData(..))
 
+-- TODO: why is this separate from GoogleSignIn?
+
 signInEvent :: (MonadWidget t m) => m (Event t CookieData)
 signInEvent = do
   googleSignIns <- gSignInEvent

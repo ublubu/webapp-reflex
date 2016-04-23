@@ -57,23 +57,25 @@ executable webapp-client
   -- other-extensions:    
   
   -- Other library packages from which modules are imported.
-  build-depends:       base
+  build-depends:       aeson
+                     , base
+                     , bytestring
+                     , containers
+                     , dependent-map
+                     , either
                      , ghcjs-base
+                     , ghcjs-servant-client
+                     , lens
+                     , mtl
+                     , parsec
+                     , ref-tf
                      , reflex
                      , reflex-dom
-                     , aeson
-                     , mtl
-                     , transformers
-                     , lens
-                     , containers
                      , safe
-                     , bytestring
-                     , text
-                     , either
-                     , ref-tf
-                     , dependent-map
                      , servant
-                     , ghcjs-servant-client
+                     , text
+                     , transformers
+                     , uuid
                      , webapp-api
   
   -- Directories containing source files.

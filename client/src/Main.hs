@@ -11,6 +11,7 @@ import Reflex.Dom
 import Control.Monad.IO.Class
 import Data.Monoid
 
+import Apply
 import Callback
 import Combinators
 import CommonWidgets
@@ -25,25 +26,23 @@ import GoogleSignIn
 
 import API.SignIn
 
+import Meathead.App
+import Meathead.RootWidget
+import Meathead.ModuleCache
+import Meathead.PageRoutes
+
 main :: IO ()
 main = mainWidgetWithHead headEl $ mdo
+  pageStateD <- unitHistoryWidget fromPath toPath pushStates
+  moduleCacheD <- moduleCache emptyModuleCache moduleRequests
+
   signIns <- signInEvent
-  centeringDiv $ rowDiv $ do
+  mUserIdD <- holdDyn Nothing (Just . _cookieDataUserId <$> signIns)
+
+  Bubbling (pushStates, moduleRequests) () <- centeringDiv $ rowDiv $ do
     columnDiv gSignInButton
-    columnDiv $ pathnameHistoryWidget parsePath (\i -> "/" ++ show i) dummyCounter
-
-dummyCounter :: (MonadWidget t m)
-             => Dynamic t Int
-             -> m (Event t Int)
-dummyCounter route = do
-  btnPresses <- ecDyn' (button . show) route
-  nextRoute <- mapDyn (+1) route
-  return $ tag (current nextRoute) btnPresses
-
-parsePath :: String -> Int
-parsePath "/" = 0
-parsePath ('/':x) = read x
-parsePath _ = error "invalid path"
+    ec $ rootWidget @/ mUserIdD /#| makeHref /# pageStateD /# moduleCacheD
+  return ()
 
 css :: String
 css = toCssString $ body <> html

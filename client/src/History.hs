@@ -17,36 +17,46 @@ import Control.Monad.IO.Class
 import Callback
 import Utils
 
+-- TODO: clean up the duplication in this file
+
 foreign import javascript unsafe "history.pushState($1, '', $2)"
   historyPushState :: JSVal -> JSString -> IO ()
 
 foreign import javascript unsafe "window.onpopstate = function (x) { $1(x.state); }"
   setWindowOnpopstate :: Callback (JSVal -> IO ()) -> IO ()
 
--- TODO: make a version that just stores a counter/simple-state in history.state
---         and manages full state history in haskell?
-historyWidget :: (MonadWidget t m, FromJSVal r, ToJSVal r)
-              => (Dynamic t r -> m (Event t r))
-              -> (r -> String)
-              -> r
-              -> m ()
-historyWidget f toPath route0 = mdo
-  currentRoute <- holdDyn route0 $ leftmost [popStates, newStates]
-  popStates <- callbackEvent setWindowOnpopstate
-  newStates <- f currentRoute
+historyWidget_ :: (MonadWidget t m, FromJSVal r, ToJSVal r)
+               => (r -> String)
+               -> Event t r -- pushstate events
+               -> m (Event t r) -- popstate events
+historyWidget_ toPath pushStates = mdo
   let push route = do
         jvRoute <- liftIO $ toJSVal route
         liftIO $ historyPushState jvRoute (JSS.pack $ toPath route)
-  performEvent_ $ push <$> newStates
+  performEvent_ $ push <$> pushStates
+  callbackEvent setWindowOnpopstate
 
-pathnameHistoryWidget :: (MonadWidget t m, FromJSVal r, ToJSVal r)
-                      => (String -> r)
-                      -> (r -> String)
-                      -> (Dynamic t r -> m (Event t r))
-                      -> m ()
-pathnameHistoryWidget fromPath toPath f = do
+pathnameHistoryWidget_ :: (MonadWidget t m, FromJSVal r, ToJSVal r)
+                       => (String -> r)
+                       -> (r -> String)
+                       -> Event t r -- pushstate events
+                       -> m (r, Event t r) -- (state0, popstate events)
+pathnameHistoryWidget_ fromPath toPath pushStates = do
   location <- liftIO getWindowLocation
   path <- fmap JSS.unpack . liftIO $ getPathname location
-  liftIO $ print path
-  newStates <- historyWidget f toPath $ fromPath path
-  noContents
+  popStates <- historyWidget_ toPath pushStates
+  return (fromPath path, popStates)
+
+unitHistoryWidget :: (MonadWidget t m)
+                  => (String -> r)
+                  -> (r -> String)
+                  -> Event t r -- pushstate events
+                  -> m (Dynamic t r) -- current state
+unitHistoryWidget fromPath toPath pushStates = do
+  location <- liftIO getWindowLocation
+  path <- fmap JSS.unpack . liftIO $ getPathname location
+  popUnits <- historyWidget_ id (toPath <$> pushStates)
+  let updates = leftmost [fmap (:) pushStates, eventValue tail popUnits]
+      state0 = fromPath path
+  historyD <- foldDyn ($) [state0] updates
+  mapDyn head historyD
