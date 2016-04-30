@@ -28,6 +28,10 @@ import Servant.Client
 
 import API.SignIn
 
+-- TODO: SetCookie shouldn't require a FromByteString instance
+import Data.ByteString.Conversion.From
+import Web.Cookie
+
 -- TODO: these are for the garbage (To|From)JSVal instances
 import Data.Aeson
 import qualified Data.JSString as JSS
@@ -50,6 +54,10 @@ foreign import javascript unsafe "JSON.parse($1)"
 -- TODO: seriously, though. figure out something better than this
 instance FromJSVal CookieData where
   fromJSVal = fmap (decode . BSC.pack . JSS.unpack) . json_stringify
+
+-- TODO: also, maybe this?
+instance FromByteString SetCookie where
+  parser = parseSetCookie <$> parser
 
 baseUrl :: Maybe BaseUrl
 baseUrl = (Just $ BaseUrl Http "localhost" 8081)

@@ -15,6 +15,7 @@ import Text.Parsec.Text
 import Meathead.Pages
 
 -- TODO: parse/unparse together?
+-- TODO: tests!
 
 pagingHrefSegment :: PagingState -> Text
 pagingHrefSegment PagingState{..} =
@@ -36,7 +37,8 @@ parsePagingState = do
 
 parseGuid :: Parser Text
 parseGuid =
-  fmap pack $ digs 8 +++ hyphen +++ digs 4 +++ hyphen +++ digs 4 +++ hyphen +++ digs 12
+  fmap pack $ digs 8 +++ hyphen +++ digs 4 +++ hyphen +++ digs 4 +++ hyphen +++ digs 4
+  +++ hyphen +++ digs 12
   where a +++ b = (++) <$> a <*> b
         digs n = count n alphaNum
         hyphen = (\x -> [x]) <$> char '-'

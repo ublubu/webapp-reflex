@@ -14,10 +14,12 @@ import Control.Monad.IO.Class (liftIO, MonadIO)
 import Data.Aeson
 import Data.Conduit
 import qualified Data.Conduit.List as C
+import Data.Foldable (find)
 import Data.Monoid
 import Data.Text (Text)
-import Data.ByteString.Char8 as BS
-import Data.ByteString.Lazy as BSL
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy as BSL
+import Data.ByteString.Conversion.To
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Network.HTTP.Client.Conduit as H
@@ -25,9 +27,13 @@ import qualified Network.HTTP.Types.Status as H
 import Servant
 import Servant.Server
 import Web.ClientSession
+import Web.Cookie
 
 import API.SignIn
 import Server.App
+
+instance ToByteString SetCookie where
+  builder = renderSetCookie
 
 signInServer :: ServerT SignInAPI App
 signInServer =
@@ -50,8 +56,10 @@ instance FromJSON GoogleTokenInfo where
   parseJSON _ = mzero
 
 withCookieText :: (CookieData -> App a) -> Maybe Text -> App a
-withCookieText f =
-  f <=< maybe (throwError $ Invalid "no cookie provided") (decryptCookie . unwrapCookie)
+withCookieText f mCookies =
+  case mCookies of
+    Nothing -> throwError $ Invalid "no cookies provided"
+    Just cookies -> f =<< maybe (throwError $ Invalid "couldn't unwrap cookie") decryptCookie (unwrapCookie cookies)
 
 withCookieText1 :: (x -> CookieData -> App a) -> x -> Maybe Text -> App a
 withCookieText1 f = withCookieText . f
@@ -59,14 +67,13 @@ withCookieText1 f = withCookieText . f
 withCookieText2 :: (x -> y -> CookieData -> App a) -> x -> y -> Maybe Text -> App a
 withCookieText2 f = withCookieText1 . f
 
-cookiePrefix :: Text
-cookiePrefix = "Session="
+wrapCookie :: Text -> SetCookie
+wrapCookie x = def { setCookieName = "Session", setCookieValue = T.encodeUtf8 x }
 
-wrapCookie :: Text -> Text
-wrapCookie cookie = cookiePrefix <> cookie
-
-unwrapCookie :: Text -> Text
-unwrapCookie = T.drop (T.length cookiePrefix)
+unwrapCookie :: Text -> Maybe Text
+unwrapCookie cookies =
+  snd <$> find ((== "Session") . fst) pairs
+  where pairs = parseCookiesText . T.encodeUtf8 $ cookies
 
 getCookieData' :: GoogleTokenInfo -> CookieData
 getCookieData' = CookieData . _googleTokenSub

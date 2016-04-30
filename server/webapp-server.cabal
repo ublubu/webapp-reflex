@@ -65,9 +65,12 @@ executable exec-csgo-guides-server
   -- Other library packages from which modules are imported.
   build-depends:       aeson
                      , base >=4.8 && <4.9
+                     , blaze-builder
                      , bytestring
+                     , bytestring-conversion
                      , clientsession
                      , conduit
+                     , cookie
                      , either
                      , esqueleto
                      , http-conduit

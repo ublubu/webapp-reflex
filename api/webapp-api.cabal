@@ -60,6 +60,8 @@ library
   -- Other library packages from which modules are imported.
   build-depends:       aeson
                      , base >=4.8 && <4.9
+                     , bytestring
+                     , cookie
                      , lens
                      , parsec
                      , servant

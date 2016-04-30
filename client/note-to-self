@@ -1,1 +1,2 @@
 cabal configure --ghcjs
+<script> tags in index.html must have absolute paths

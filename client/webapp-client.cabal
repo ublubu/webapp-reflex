@@ -58,9 +58,12 @@ executable webapp-client
   
   -- Other library packages from which modules are imported.
   build-depends:       aeson
+                     , attoparsec
                      , base
                      , bytestring
+                     , bytestring-conversion
                      , containers
+                     , cookie
                      , dependent-map
                      , either
                      , ghcjs-base

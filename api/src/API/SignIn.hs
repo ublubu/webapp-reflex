@@ -6,20 +6,23 @@
 
 module API.SignIn where
 
+import GHC.Generics
+
 import Control.Monad
 import Data.Aeson
 import Data.Text (Text)
-import GHC.Generics
+
 import Servant.API
+import Web.Cookie
 
 data CookieData = CookieData { _cookieDataUserId :: Text } deriving (Show, Eq, Generic)
 
 instance FromJSON CookieData
 instance ToJSON CookieData
 
--- TODO: use something better than `Text` for SetCookied and Cookied
---       e.g. the types in the "cookie" library
-type SetCookied a = Headers '[Header "Set-Cookie" Text] a
+-- TODO: allow client to read /some/ cookies without asking server?
+--       e.g. using `CookiesText` (from "cookie" package) for `Cookied`
+type SetCookied a = Headers '[Header "Set-Cookie" SetCookie] a
 type Cookied = Header "Cookie" Text
 type SignInAPI =
   "tokensignin" :> QueryParam "idtoken" Text :> Get '[JSON] (SetCookied CookieData)
