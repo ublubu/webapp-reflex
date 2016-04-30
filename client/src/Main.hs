@@ -41,9 +41,11 @@ main = mainWidgetWithHead headEl $ mdo
   signIns <- signInEvent
   mUserIdD <- holdDyn Nothing (Just . _cookieDataUserId <$> signIns)
 
-  Bubbling (pushStates, moduleRequests) () <- centeringDiv $ rowDiv $ do
-    columnDiv gSignInButton
+  -- visible widgets
+  columnDiv gSignInButton
+  Bubbling (pushStates, moduleRequests) () <-
     ec $ rootWidget @/ mUserIdD /#| makeHref /# pageStateD /# moduleCacheD
+
   return ()
 
 css :: String

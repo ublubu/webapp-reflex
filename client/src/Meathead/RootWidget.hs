@@ -24,7 +24,7 @@ rootWidget :: (MonadWidget t m)
 rootWidget mUserId makeHref routeD cache =
   dCase routeD
   [ _AllModulesPage `DCase` \page -> allModulesWidget makeHref page cache
-  , _MyModulesPage `DCase` \page -> allModulesWidget makeHref page cache
+  , _MyModulesPage `DCase` \page -> myModulesWidget makeHref page cache
   , _ModulePage `DCase` moduleWidget mUserId makeHref cache
   , _ModuleCreatePage `DCase` moduleCreationWidget cache
   ]

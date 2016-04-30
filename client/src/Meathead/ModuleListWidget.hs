@@ -10,6 +10,7 @@ import Reflex.Dom
 
 import Control.Lens
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Text (Text, pack, unpack)
 
 import API.Module
@@ -36,7 +37,7 @@ moduleListWidget :: forall t m. (MonadWidget t m)
                  -> ModuleThumbnailConfig
                  -> Dynamic t [ModuleView]
                  -> m (BubbleApp' t)
-moduleListWidget makeHref mtConfig modulesD =
+moduleListWidget makeHref mtConfig modulesD = do
   ec $ (\mdls -> ecLeftmost <$> mapM (moduleThumbnailWidget makeHref mtConfig) mdls) @/ modulesD
 
 moduleThumbnailWidget :: (MonadWidget t m)
@@ -45,8 +46,13 @@ moduleThumbnailWidget :: (MonadWidget t m)
                       -> ModuleView
                       -> m (BubbleApp' t)
 moduleThumbnailWidget makeHref ModuleThumbnailConfig{..} (ModuleMeta{..}, mParentGuid, ModuleEdit{..}) = do
-  titleClicks <- el "p" $ moduleLink makeHref _mmGuid _meTitle
-  parentClicks <- el "p" $ maybe ecNever (\pg -> moduleLink makeHref pg pg) mParentGuid
+  titleClicks <- el "p" $ do
+    text "title: "
+    moduleLink makeHref _mmGuid _meTitle
+  let f pg = el "p" $ do
+        text "parent: "
+        moduleLink makeHref pg pg
+  parentClicks <- maybe ecNever f mParentGuid
   delClicks <- whenE _mtcDeletable $ deleteModuleLink _mmGuid
   editClicks <- whenE _mtcEditable $ editModuleLink _mmGuid
   return $ ecLeftmost [titleClicks, parentClicks, delClicks]

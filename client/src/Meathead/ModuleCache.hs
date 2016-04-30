@@ -112,6 +112,10 @@ handleModuleRequest (UpdateModule guid module_) =
   ModifyModuleUpdate <$> putModule guid module_
 handleModuleRequest (DeleteModule guid) =
   deleteModule guid >> return (DeleteModuleUpdate guid)
+handleModuleRequest (ReadModules paging@PagingState{..}) =
+  AllModulesUpdate paging <$> getModules (Just _pagingOffset) (Just _pagingCount)
+handleModuleRequest (ReadMyModules paging@PagingState{..}) =
+  MyModulesUpdate paging <$> myModules (Just _pagingOffset) (Just _pagingCount)
 
 -- TODO: partial results?
 maybeModulePage :: PagingState -> ModuleListCache -> Maybe [ModuleView]
@@ -122,7 +126,7 @@ maybeModulePage paging ModuleListCache{..} =
 -- TODO: make a proper cache
 deleteGuidFromList :: Text -> ModuleListCache -> ModuleListCache
 deleteGuidFromList guid cache =
-  cache & mlcPage %~ filter ((== guid) . view (_1 . mmGuid))
+  cache & mlcPage %~ filter ((/= guid) . view (_1 . mmGuid))
 
 moduleLookup :: Text -> ModuleCache -> Maybe ModuleView
 moduleLookup guid = M.lookup guid . _mcMap

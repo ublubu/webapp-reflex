@@ -27,6 +27,8 @@ import Meathead.App
 import Meathead.ModuleCache
 import Meathead.Pages
 
+-- TODO: cloning doesn't seem to work
+
 -- TODO: newtype for userId
 moduleWidget :: forall t m. (MonadWidget t m)
              => Maybe Text -- userId
@@ -53,12 +55,15 @@ moduleEditForm :: forall t m. (MonadWidget t m)
                => ModuleEdit
                -> m (Dynamic t ModuleEdit)
 moduleEditForm ModuleEdit{..} = do
-  paraS "title"
-  title <- simpleTextInput _meTitle
-  paraS "description"
-  description <- nullToNothing $/ simpleTextInput (fromMaybe "" _meDescription)
-  paraS "code"
-  code <- simpleTextInput _meCode
+  title <- el "p" $ do
+    text "title: "
+    simpleTextInput _meTitle
+  description <- el "p" $ do
+    text "description: "
+    nullToNothing $/ simpleTextInput (fromMaybe "" _meDescription)
+  code <- el "p" $ do
+    text "code: "
+    simpleTextInput _meCode
   ModuleEdit @/ title /#/ description /#/ code
   where nullToNothing x = if T.null x then Nothing else Just x
 
@@ -173,12 +178,26 @@ moduleViewWidget_ :: forall t m. (MonadWidget t m)
 moduleViewWidget_ mUserId (ModuleMeta{..}, mParentGuid, ModuleEdit{..}) makeHref = do
   editClicks <- if mUserId /= Just _mmAuthor then ecNever
                 else appLink makeHref (pageEditModule _mmGuid) "edit"
-  paraT _meTitle
-  paraT _mmGuid
-  parentClicks <- maybe ecNever (\pg -> el "p" $ moduleLink makeHref pg pg) mParentGuid
-  paraT _mmAuthor
-  maybe noContents paraT _meDescription
-  paraT _meCode
+  el "p" $ do
+    text "title: "
+    textT _meTitle
+  el "p" $ do
+    text "guid: "
+    textT _mmGuid
+  let f pg = el "p" $ do
+        text "parent: "
+        moduleLink makeHref pg pg
+  parentClicks <- maybe ecNever f mParentGuid
+  el "p" $ do
+    text "author: "
+    textT _mmAuthor
+  let g desc = el "p" $ do
+        text "description: "
+        textT desc
+  maybe noContents g _meDescription
+  el "p" $ do
+    text "code: "
+    textT _meCode
   return parentClicks
 
 withFirstCachedModuleView :: forall t m a. (MonadWidget t m, EventContainer t m a)
