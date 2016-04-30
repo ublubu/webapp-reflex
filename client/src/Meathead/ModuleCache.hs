@@ -41,6 +41,7 @@ data ModuleRequest =
   | DeleteModule Text
   | ReadModules PagingState
   | ReadMyModules PagingState
+  deriving (Show, Eq)
 makePrisms ''ModuleRequest
 
 -- TODO: make a proper cache
@@ -113,7 +114,7 @@ handleModuleRequest (DeleteModule guid) =
   deleteModule guid >> return (DeleteModuleUpdate guid)
 
 -- TODO: partial results?
-maybeModulePage :: PagingState-> ModuleListCache -> Maybe [ModuleView]
+maybeModulePage :: PagingState -> ModuleListCache -> Maybe [ModuleView]
 maybeModulePage paging ModuleListCache{..} =
   if paging == _mlcPaging then Just _mlcPage
   else Nothing

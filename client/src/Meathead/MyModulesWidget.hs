@@ -24,9 +24,9 @@ myModulesWidget :: forall t m. (MonadWidget t m)
                 -> Dynamic t ModuleCache
                 -> m (BubbleApp' t)
 myModulesWidget makeHref paging cache = do
-  listCache <- mapDyn _mcMine cache
-  moduleListWidget makeHref paging listCache mtConfig
-  where mtConfig = ModuleThumbnailConfig { _mtcDeletable = True
+  ec $ withCachedModuleList _mcMine ReadMyModules @/ paging /# cache /# makeWidget
+  where makeWidget = moduleListWidget makeHref mtConfig
+        mtConfig = ModuleThumbnailConfig { _mtcDeletable = True
                                          , _mtcEditable = True
                                          , _mtcCloneable = True
                                          }

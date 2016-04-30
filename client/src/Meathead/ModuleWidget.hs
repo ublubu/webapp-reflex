@@ -205,7 +205,7 @@ withCachedModuleView_ filterModuleD guid cache makeWidget = do
   -- fetch the module
   moduleD <- filterModuleD =<< moduleLookup guid @/ cache
   module_ <- sample . current $ moduleD
-  readModule <- maybe ecNever (const $ fire (ReadModule guid)) module_
+  readModule <- maybe (fire $ ReadModule guid) (const ecNever) module_
   childEvents <- dWhenJust moduleD makeWidget
   return $ childEvents & bBubble . _2 %~ ecCombine readModule
 

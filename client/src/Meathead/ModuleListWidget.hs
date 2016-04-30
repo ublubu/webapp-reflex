@@ -17,6 +17,7 @@ import API.Module
 import Apply
 import Combinators
 import CommonWidgets
+import Utils
 
 import Meathead.App
 import Meathead.ModuleCache
@@ -31,17 +32,12 @@ data ModuleThumbnailConfig =
 makeLenses ''ModuleThumbnailConfig
 
 moduleListWidget :: forall t m. (MonadWidget t m)
-                 => Dynamic t (PageState -> Text)
-                 -> Dynamic t PagingState -- route-ish
-                 -> Dynamic t ModuleListCache -- backend interface
+                 => Dynamic t (PageState -> Text) -- making hrefs
                  -> ModuleThumbnailConfig
-                 -- bubbling up route-ish and backend interface events
+                 -> Dynamic t [ModuleView]
                  -> m (BubbleApp' t)
-moduleListWidget makeHref paging cache mtConfig = do
-  modules <- combineDyn maybeModulePage paging cache
-  dWhenJust modules f
-  where f :: Dynamic t [ModuleView] -> m (BubbleApp t ())
-        f mdlsD = ec $ (\mdls -> ecLeftmost <$> mapM (moduleThumbnailWidget makeHref mtConfig) mdls) @/ mdlsD
+moduleListWidget makeHref mtConfig modulesD =
+  ec $ (\mdls -> ecLeftmost <$> mapM (moduleThumbnailWidget makeHref mtConfig) mdls) @/ modulesD
 
 moduleThumbnailWidget :: (MonadWidget t m)
                       => Dynamic t (PageState -> Text)
@@ -66,3 +62,28 @@ editModuleLink :: (MonadWidget t m)
                -> m (BubbleApp' t)
 editModuleLink guid =
   bubbleWith _1 =<< fmap (const $ pageEditModule guid) <$> button "edit"
+
+withCachedModuleList :: forall t m a. (EventContainer t m a)
+                     => (ModuleCache -> ModuleListCache)
+                     -> (PagingState -> ModuleRequest)
+                     -> PagingState
+                     -> Dynamic t ModuleCache
+                     -> (Dynamic t [ModuleView] -> m (BubbleApp t a))
+                     -> m (BubbleApp t a)
+withCachedModuleList = withCachedModuleList_ return
+
+withCachedModuleList_ :: forall t m a x. (EventContainer t m a)
+                      => (Dynamic t (Maybe [ModuleView]) -> m (Dynamic t (Maybe [ModuleView])))
+                      -> (ModuleCache -> ModuleListCache)
+                      -> (PagingState -> ModuleRequest)
+                      -> PagingState
+                      -> Dynamic t ModuleCache
+                      -> (Dynamic t [ModuleView] -> m (BubbleApp t a))
+                      -> m (BubbleApp t a)
+withCachedModuleList_ filterListD _listCache makeRequest paging cache makeWidget = do
+  -- fetch the module list
+  listD <- filterListD =<< maybeModulePage paging $/ mapDyn _listCache cache
+  list_ <- sample . current $ listD
+  readList <- maybe (fire $ makeRequest paging) (const ecNever) list_
+  childEvents <- dWhenJust listD makeWidget
+  return $ childEvents & bBubble . _2 %~ ecCombine readList
