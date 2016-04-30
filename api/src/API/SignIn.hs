@@ -17,7 +17,10 @@ data CookieData = CookieData { _cookieDataUserId :: Text } deriving (Show, Eq, G
 instance FromJSON CookieData
 instance ToJSON CookieData
 
+-- TODO: use something better than `Text` for SetCookied and Cookied
+--       e.g. the types in the "cookie" library
 type SetCookied a = Headers '[Header "Set-Cookie" Text] a
 type Cookied = Header "Cookie" Text
-type SignInAPI = "tokensignin" :> QueryParam "idtoken" Text :> Get '[JSON] (SetCookied CookieData)
-                 :<|> "cookiedata" :> Cookied :> Get '[JSON] CookieData
+type SignInAPI =
+  "tokensignin" :> QueryParam "idtoken" Text :> Get '[JSON] (SetCookied CookieData)
+  :<|> "cookiedata" :> Cookied :> Get '[JSON] CookieData

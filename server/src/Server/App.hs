@@ -40,13 +40,18 @@ type App = ReaderT AppConfig (ExceptT AppError IO)
 instance HasHttpManager AppConfig where
   getHttpManager = _appConfigHttpManager
 
+-- TODO: proper logging
 runApp :: AppConfig -> App a -> EitherT ServantErr IO a
 runApp config action = do
   res <- liftIO . runExceptT . flip runReaderT config $ action
-  EitherT $ return $ case res of
-    Left (Invalid text) -> Left err400 { errBody = encodeUtf8 . fromStrict $ text }
-    Left (WrappedServantErr e) -> Left e
-    Right a -> Right a
+  EitherT $ case res of
+    Left (Invalid text) -> do
+      print text
+      return $ Left err400 { errBody = encodeUtf8 . fromStrict $ text }
+    Left (WrappedServantErr e) -> do
+      print e
+      return $ Left e
+    Right a -> return $ Right a
 
 -- TODO: ssl for the Manager
 defaultAppConfig :: (MonadIO m) => FilePath -> m AppConfig

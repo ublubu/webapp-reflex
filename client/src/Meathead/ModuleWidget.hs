@@ -164,6 +164,7 @@ moduleViewWidget mUserId makeHref guid cache =
   \moduleD -> ec $ moduleViewWidget_ mUserId @/ moduleD /# makeHref
 
 -- NOTE: "edit" link routes to "edit module" page
+-- TODO: "delete" button?
 moduleViewWidget_ :: forall t m. (MonadWidget t m)
                   => Maybe Text -- userId
                   -> ModuleView
