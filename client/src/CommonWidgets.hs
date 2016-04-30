@@ -88,6 +88,8 @@ buttonWhile :: (MonadWidget t m)
             -> String
             -> m (Event t ())
 buttonWhile enableD label = do
-  let f enable = "type" =: "button" <> "disabled" =: ""
+  let f enable =
+        let attrs = "type" =: "button"
+        in if enable then attrs else attrs <> "disabled" =: ""
   (elem, _) <- join $ elDynAttr' "button" <$> mapDyn f enableD <#> text label
   return $ domEvent Click elem
