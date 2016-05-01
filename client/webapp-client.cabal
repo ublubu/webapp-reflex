@@ -67,6 +67,7 @@ executable webapp-client
                      , dependent-map
                      , either
                      , ghcjs-base
+                     , ghcjs-dom
                      , ghcjs-servant-client
                      , lens
                      , mtl

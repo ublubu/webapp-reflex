@@ -4,10 +4,15 @@
 
 module CommonWidgets where
 
+import qualified GHCJS.DOM.Element as GD
+import GHCJS.DOM.EventM (preventDefault)
+
 import Reflex
 import Reflex.Dom
 
+import Control.Applicative
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Monoid
 import Data.Text (Text, unpack, pack)
 
@@ -60,7 +65,10 @@ anchorT :: (MonadWidget t m)
         -> m (Event t a)
 anchorT Anchor{..} = do
   (elem, _) <- elAttr' "a" ("href" =: unpack _anchorHref) $ textT _anchorText
-  return $ const _anchorPayload <$> domEvent Click elem
+  clicks <- wrapDomEvent (_el_element elem) (onEventName Click) preventDefault
+  -- NOTE: the line below stops unsubscribed <a> clicks from rerouting the browser
+  --performEvent_ $ return () <$ clicks
+  return $ const _anchorPayload <$> clicks
 
 dynAnchorT :: (MonadWidget t m)
            => Dynamic t (Anchor a)

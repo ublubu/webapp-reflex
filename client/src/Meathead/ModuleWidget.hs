@@ -171,6 +171,7 @@ moduleViewWidget mUserId makeHref guid cache =
 
 -- NOTE: "edit" link routes to "edit module" page
 -- TODO: "delete" button?
+-- TODO: monad transformer (?) for collecting all bubbled events from a layout?
 moduleViewWidget_ :: forall t m. (MonadWidget t m)
                   => Maybe Text -- userId
                   -> ModuleView
@@ -199,7 +200,7 @@ moduleViewWidget_ mUserId (ModuleMeta{..}, mParentGuid, ModuleEdit{..}) makeHref
   el "p" $ do
     text "code: "
     textT _meCode
-  return parentClicks
+  return $ ecCombine editClicks parentClicks
 
 withFirstCachedModuleView :: forall t m a. (MonadWidget t m, EventContainer t m a)
                      => Text
