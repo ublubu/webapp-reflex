@@ -113,7 +113,8 @@ moduleCloneWidget_ :: forall t m. (MonadWidget t m)
                    -> m (BubbleApp t (Event t ()))
 moduleCloneWidget_ reqGuid guid cache = do
   withFirstCachedModuleView guid cache $
-    \moduleD -> ec $ moduleCreateWidget_ reqGuid $/ mapDyn viewToCreate moduleD
+    \moduleD -> ec $ moduleCreateWidget_ reqGuid $/ mapDyn f moduleD
+  where f (_, _, moduleEdit) = (Just guid, moduleEdit)
 
 -- top-level widget for editing a module
 -- routes to "view module" page on exit
