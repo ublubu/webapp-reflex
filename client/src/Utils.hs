@@ -98,3 +98,6 @@ eventValue = fmap . const
 
 fire :: (MonadWidget t m) => r -> m (Event t r)
 fire r = eventValue r <$> getPostBuild
+
+foldsDyn :: (MonadWidget t m) => (a -> b -> b) -> b -> Event t [a] -> m (Dynamic t b)
+foldsDyn f = foldDyn (flip $ F.foldl' (flip f))

@@ -77,7 +77,7 @@ newModuleWidget cache makeWidget = do
   reqGuid <- getReqGuid
   Bubbling bub submit <- makeWidget reqGuid
   guidE <- eWhenFirst submit $ moduleCreated reqGuid cache
-  return . bubbling $ bub & _1 %~ ecCombine (pageViewModule <$> guidE)
+  return . bubbling $ bub & _1 %~ ecCat (wrapCat $ pageViewModule <$> guidE)
 
 -- top-level widget to create a widget from scratch
 moduleCreateWidget :: forall t m. (MonadWidget t m)
@@ -104,7 +104,7 @@ moduleCreateWidget_ reqGuid (mParentGuid, moduleEdit) = do
   moduleEditD <- moduleEditForm moduleEdit
   submit <- el "p" $ onceButton "create"
   moduleD <- (CreateModule reqGuid . (mParentGuid,)) @/ moduleEditD
-  return $ Bubbling (never, tagDyn moduleD submit) submit
+  return $ Bubbling (never, wrapCat $ tagDyn moduleD submit) submit
 
 moduleCloneWidget_ :: forall t m. (MonadWidget t m)
                    => RequestGuid
@@ -152,11 +152,14 @@ moduleEditWidget_ (ModuleMeta{..}, _, moduleEdit) exitPage = mdo
 
   let saveEvent = tagDyn moduleEditD'
       exitEvent = eventValue exitPage
-  saveClick <- bubbleWith _2 $ saveEvent save
-  cancelClick <- bubbleWith _1 $ exitEvent cancel
-  let submitClick = bubble (exitEvent submit, saveEvent submit)
+      saveClick :: BubbleApp' t
+      saveClick = bubbleWrapWith _2 $ saveEvent save
+      cancelClick :: BubbleApp' t
+      cancelClick = bubbleWrapWith _1 $ exitEvent cancel
+      submitClick :: BubbleApp' t
+      submitClick = bubble (wrapCat $ exitEvent submit, wrapCat $ saveEvent submit)
 
-  return $ ecLeftmost [saveClick, cancelClick, submitClick]
+  return $ ecConcat [saveClick, cancelClick, submitClick]
 
 -- top-level widget for viewing a module
 moduleViewWidget :: forall t m. (MonadWidget t m)
@@ -178,8 +181,9 @@ moduleViewWidget_ :: forall t m. (MonadWidget t m)
                   -> Dynamic t (PageState -> Text)
                   -> m (BubbleApp' t)
 moduleViewWidget_ mUserId (ModuleMeta{..}, mParentGuid, ModuleEdit{..}) makeHref = do
-  editClicks <- if mUserId /= Just _mmAuthor then ecNever
+  editClicks <- if mUserId /= Just _mmAuthor then return ecNever
                 else appLink makeHref (pageEditModule _mmGuid) "edit"
+  cloneClicks <- appLink makeHref (ModuleCreatePage $ Just _mmGuid) "clone"
   el "p" $ do
     text "title: "
     textT _meTitle
@@ -189,7 +193,7 @@ moduleViewWidget_ mUserId (ModuleMeta{..}, mParentGuid, ModuleEdit{..}) makeHref
   let f pg = el "p" $ do
         text "parent: "
         moduleLink makeHref pg pg
-  parentClicks <- maybe ecNever f mParentGuid
+  parentClicks <- maybe (return ecNever) f mParentGuid
   el "p" $ do
     text "author: "
     textT _mmAuthor
@@ -200,7 +204,7 @@ moduleViewWidget_ mUserId (ModuleMeta{..}, mParentGuid, ModuleEdit{..}) makeHref
   el "p" $ do
     text "code: "
     textT _meCode
-  return $ ecCombine editClicks parentClicks
+  return $ ecConcat [editClicks, cloneClicks, parentClicks]
 
 withFirstCachedModuleView :: forall t m a. (MonadWidget t m, EventContainer t m a)
                      => Text
@@ -226,9 +230,9 @@ withCachedModuleView_ filterModuleD guid cache makeWidget = do
   -- fetch the module
   moduleD <- filterModuleD =<< moduleLookup guid @/ cache
   module_ <- sample . current $ moduleD
-  readModule <- maybe (fire $ ReadModule guid) (const ecNever) module_
+  readModule <- maybe (fire $ ReadModule guid) (const $ return ecNever) module_
   childEvents <- dWhenJust moduleD makeWidget
-  return $ childEvents & bBubble . _2 %~ ecCombine readModule
+  return $ childEvents & bBubble . _2 %~ ecCons readModule
 
 moduleLink :: (MonadWidget t m)
            => Dynamic t (PageState -> Text)
@@ -246,6 +250,3 @@ viewToCreate (_, mParentGuid, edit) = (mParentGuid, edit)
 emptyModuleEdit :: ModuleEdit
 emptyModuleEdit =
   ModuleEdit "" Nothing ""
-
--- TODO: Replace create/clone form on submission
--- TODO: Module /view/ widget

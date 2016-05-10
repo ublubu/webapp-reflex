@@ -52,22 +52,29 @@ moduleThumbnailWidget makeHref ModuleThumbnailConfig{..} (ModuleMeta{..}, mParen
   let f pg = el "p" $ do
         text "parent: "
         moduleLink makeHref pg pg
-  parentClicks <- maybe ecNever f mParentGuid
+  parentClicks <- maybe (return ecNever) f mParentGuid
   delClicks <- whenE _mtcDeletable $ deleteModuleLink _mmGuid
   editClicks <- whenE _mtcEditable $ editModuleLink _mmGuid
-  return $ ecLeftmost [titleClicks, parentClicks, delClicks]
+  cloneClicks <- whenE _mtcCloneable $ cloneModuleLink _mmGuid
+  return $ ecLeftmost [titleClicks, parentClicks, delClicks, cloneClicks]
 
 deleteModuleLink :: (MonadWidget t m)
                  => Text
                  -> m (BubbleApp' t)
 deleteModuleLink guid =
-  bubbleWith _2 =<< fmap (const $ DeleteModule guid) <$> button "delete"
+  bubbleWrapWith _2 <$> fmap (const $ DeleteModule guid) <$> button "delete"
 
 editModuleLink :: (MonadWidget t m)
                => Text
                -> m (BubbleApp' t)
 editModuleLink guid =
-  bubbleWith _1 =<< fmap (const $ pageEditModule guid) <$> button "edit"
+  bubbleWrapWith _1 <$> fmap (const $ pageEditModule guid) <$> button "edit"
+
+cloneModuleLink :: (MonadWidget t m)
+               => Text
+               -> m (BubbleApp' t)
+cloneModuleLink guid =
+  bubbleWrapWith _1 <$> fmap (const . ModuleCreatePage $ Just guid) <$> button "clone"
 
 withCachedModuleList :: forall t m a. (EventContainer t m a)
                      => (ModuleCache -> ModuleListCache)
@@ -90,6 +97,6 @@ withCachedModuleList_ filterListD _listCache makeRequest paging cache makeWidget
   -- fetch the module list
   listD <- filterListD =<< maybeModulePage paging $/ mapDyn _listCache cache
   list_ <- sample . current $ listD
-  readList <- maybe (fire $ makeRequest paging) (const ecNever) list_
+  readList <- maybe (fire $ makeRequest paging) (const $ return ecNever) list_
   childEvents <- dWhenJust listD makeWidget
-  return $ childEvents & bBubble . _2 %~ ecCombine readList
+  return $ childEvents & bBubble . _2 %~ ecCons readList

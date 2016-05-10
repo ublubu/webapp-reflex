@@ -1,1 +1,1 @@
-../../try-reflex/work-on ./webapp-ghcjs.nix ./.
+../../reflex-platform/work-on ./webapp-ghcjs.nix ./.

@@ -11,6 +11,7 @@ import Control.Lens
 import Control.Lens.At
 import Control.Lens.TH
 import Control.Monad.IO.Class
+import Data.Foldable (foldl')
 import Data.Text (Text)
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -72,15 +73,19 @@ makePrisms ''ModuleCacheUpdate
 -- analogous to flux store
 moduleCache :: (MonadWidget t m)
             => ModuleCache
-            -> Event t ModuleRequest
+            -> Event t [ModuleRequest]
             -> m (Dynamic t ModuleCache)
 moduleCache cache0 reqE = do
-  resE <- performWithLog handleModuleRequest reqE
-  foldDyn applyCacheUpdate cache0 resE
+  resE <- performWithLog handleModuleRequests reqE
+  foldDyn applyCacheUpdates cache0 resE
 
 setModules :: Map Text ModuleView -> [ModuleView] -> Map Text ModuleView
 setModules =
   foldl (\cacheMap module_ -> M.insert (module_ ^. _1.mmGuid) module_ cacheMap)
+
+applyCacheUpdates :: [ModuleCacheUpdate] -> ModuleCache -> ModuleCache
+applyCacheUpdates updates cache0 =
+  foldl' (flip applyCacheUpdate) cache0 updates
 
 -- TODO: does SetModule update All/Mine?
 -- TODO: ModifyModule should update All/Mine
@@ -102,6 +107,9 @@ applyCacheUpdate (AllModulesUpdate paging modules) =
 applyCacheUpdate (MyModulesUpdate paging modules) =
   (mcMine .~ ModuleListCache paging modules)
   . (mcMap %~ flip setModules modules)
+
+handleModuleRequests :: [ModuleRequest] -> ServIO [ModuleCacheUpdate]
+handleModuleRequests = mapM handleModuleRequest
 
 handleModuleRequest :: ModuleRequest -> ServIO ModuleCacheUpdate
 handleModuleRequest (CreateModule reqGuid module_) =

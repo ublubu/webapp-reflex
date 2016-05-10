@@ -33,7 +33,7 @@ import Meathead.PageRoutes
 
 main :: IO ()
 main = mainWidgetWithHead headEl $ mdo
-  pageStateD <- unitHistoryWidget fromPath toPath pushStates
+  pageStateD <- pathnameHistoryWidget'' fromPath toPath pushStates
   moduleCacheD <- moduleCache emptyModuleCache moduleRequests
   performEvent_ $ liftIO . print <$> updated pageStateD
   performEvent_ $ liftIO . print <$> moduleRequests

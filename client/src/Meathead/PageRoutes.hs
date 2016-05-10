@@ -8,7 +8,7 @@ import Control.Applicative
 import Control.Monad
 import Data.Maybe
 import Data.Text (Text, pack, append, unpack)
-import Text.Parsec (runParser, option, count, many1, optionMaybe, try)
+import Text.Parsec (runParser, option, count, many1, optionMaybe, try, eof)
 import Text.Parsec.Char
 import Text.Parsec.Text
 
@@ -46,7 +46,7 @@ parseGuid =
 -- TODO: configure default PagingState somewhere
 parseAllModules :: Parser PageState
 parseAllModules = do
-  void $ string "all"
+  optional $ string "all"
   AllModulesPage <$> option (PagingState 0 100) parsePagingState
 
 parseMyModules :: Parser PageState
@@ -70,10 +70,16 @@ parseClonePage = do
   void $ string "clone/"
   ModuleCreatePage . Just <$> parseGuid
 
+wrapPageParser :: Parser PageState -> Parser PageState
+wrapPageParser p = try p <* eof
+
+pageParsers :: [Parser PageState] -> Parser PageState
+pageParsers ps = foldl1 (<|>) (wrapPageParser <$> ps)
+
 parseHref :: Parser PageState
 parseHref = do
   void $ char '/'
-  try parseAllModules <|> try parseMyModules <|> try parseModulePage <|> try parseCreatePage <|> try parseClonePage
+  pageParsers [parseAllModules, parseMyModules, parseModulePage, parseCreatePage, parseClonePage]
 
 makeHref :: PageState -> Text
 makeHref (AllModulesPage paging) =

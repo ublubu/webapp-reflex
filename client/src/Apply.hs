@@ -14,7 +14,6 @@ import Control.Lens
 import Control.Monad
 import Data.Monoid
 
-import Combinators
 import Utils
 
 {-
@@ -55,24 +54,6 @@ To extract anything from a sequence of [@$#*] WITHOUT [/], use `join`
 -}
 -- TODO: see if these operators can be typeclassed together
 -- TODO: investigate Data.Functor.Compose
-
-------------------------------------------------------------------------------------------
--- extraction (?)
-------------------------------------------------------------------------------------------
-
-{-
-see Combinators:
-
-ec :: (EventContainer t m r) => m (Dynamic t (m r)) -> m r
--}
-
-withPreview :: forall t m e s a. (EventContainer t m e)
-            => (Dynamic t a -> m e)
-            -> Getting (First a) s a
-            -> Dynamic t s
-            -> m e
-withPreview f prism superD =
-  join $ dWhenJust <$> (preview prism @/ superD) <#> f
 
 ------------------------------------------------------------------------------------------
 -- pure

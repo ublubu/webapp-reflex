@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Meathead.RootWidget where
 
 import Reflex
@@ -21,10 +23,16 @@ rootWidget :: (MonadWidget t m)
            -> Dynamic t PageState
            -> Dynamic t ModuleCache
            -> m (BubbleApp' t)
-rootWidget mUserId makeHref routeD cache =
-  dCase routeD
-  [ _AllModulesPage `DCase` \page -> allModulesWidget makeHref page cache
-  , _MyModulesPage `DCase` \page -> myModulesWidget makeHref page cache
-  , _ModulePage `DCase` moduleWidget mUserId makeHref cache
-  , _ModuleCreatePage `DCase` moduleCreationWidget cache
-  ]
+rootWidget mUserId makeHref routeD cache = do
+  navBubbles <- el "div" $ do
+    allClicks <- appLink makeHref (pageAllModules 0 100) "all"
+    text " "
+    myClicks <- appLink makeHref (pageMyModules 0 100) "mine"
+    return $ ecConcat [allClicks, myClicks]
+  pageBubbles <- dCase routeD
+    [ _AllModulesPage `DCase` \page -> allModulesWidget makeHref page cache
+    , _MyModulesPage `DCase` \page -> myModulesWidget makeHref page cache
+    , _ModulePage `DCase` moduleWidget mUserId makeHref cache
+    , _ModuleCreatePage `DCase` moduleCreationWidget cache
+    ]
+  return $ ecConcat [pageBubbles, navBubbles]

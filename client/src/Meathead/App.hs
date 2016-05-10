@@ -17,7 +17,7 @@ import Meathead.Pages
 import Meathead.ModuleCache
 
 type BubbleApp t e =
-  Bubbling t (Event t PageState, Event t ModuleRequest) e
+  Bubbling t (Event t [PageState], Event t [ModuleRequest]) e
 
 type BubbleApp' t = BubbleApp t ()
 
@@ -28,4 +28,4 @@ appLink :: (MonadWidget t m)
            -> m (BubbleApp' t)
 appLink makeHref link label = do
   anchorD <- mapDyn (\mkHref -> Anchor label (mkHref link) link) makeHref
-  bubbleWith _1 =<< dynAnchorT anchorD
+  bubbleWith _1 . wrapCat <$> dynAnchorT anchorD
